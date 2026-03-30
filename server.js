@@ -53,6 +53,12 @@ app.post('/parse', async (req, res) => {
 
     let content = article?.content || '<p>Nessun contenuto</p>';
 
+// ❌ rimuove immagini
+content = content.replace(/<img[^>]*>/gi, '');
+
+// ❌ rimuove figure (spesso contengono immagini)
+content = content.replace(/<figure[\s\S]*?<\/figure>/gi, '');
+
 // rimuove attributi inutili ma mantiene link
 content = content.replace(/style="[^"]*"/g, '');
 content = content.replace(/class="[^"]*"/g, '');
