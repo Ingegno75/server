@@ -6,34 +6,66 @@ import { Readability } from '@mozilla/readability';
 const app = express();
 app.use(express.json());
 
-// CORS semplice
+// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', '*');
   next();
 });
 
+// cache semplice in memoria
+const cache = new Map();
+
 app.post('/parse', async (req, res) => {
   const { url } = req.body;
 
+  if (!url) {
+    return res.status(400).json({ error: 'URL mancante' });
+  }
+
+  // 🔥 CACHE
+  if (cache.has(url)) {
+    console.log("CACHE HIT");
+    return res.json(cache.get(url));
+  }
+
   try {
+    console.log("FETCH:", url);
+
     const response = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      timeout: 8000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'text/html'
+      },
+      maxContentLength: 2 * 1024 * 1024 // 2MB
     });
 
-    const dom = new JSDOM(response.data, { url });
+    let html = response.data;
+
+    // 🔥 rimuove script e style (velocizza parsing)
+    html = html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
+    html = html.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '');
+
+    const dom = new JSDOM(html, { url });
     const reader = new Readability(dom.window.document);
     const article = reader.parse();
 
-    res.json({
+    const result = {
       title: article?.title || 'Nessun titolo',
       content: article?.textContent || 'Nessun contenuto'
-    });
+    };
+
+    // 🔥 salva in cache
+    cache.set(url, result);
+
+    res.json(result);
 
   } catch (err) {
-    res.status(500).json({ error: 'Errore parsing' });
+    console.error(err.message);
+    res.status(500).json({ error: 'Errore parsing pagina' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server attivo"));
+app.listen(PORT, () => console.log("Server ottimizzato attivo su porta " + PORT));
