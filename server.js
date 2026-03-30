@@ -51,10 +51,17 @@ app.post('/parse', async (req, res) => {
     const reader = new Readability(dom.window.document);
     const article = reader.parse();
 
-    const result = {
-      title: article?.title || 'Nessun titolo',
-      content: article?.textContent || 'Nessun contenuto'
-    };
+    let content = article?.content || '<p>Nessun contenuto</p>';
+
+// rimuove attributi inutili ma mantiene link
+content = content.replace(/style="[^"]*"/g, '');
+content = content.replace(/class="[^"]*"/g, '');
+content = content.replace(/id="[^"]*"/g, '');
+
+const result = {
+  title: article?.title || 'Nessun titolo',
+  content: content
+};
 
     // 🔥 salva in cache
     cache.set(url, result);
